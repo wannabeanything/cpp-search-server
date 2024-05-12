@@ -62,9 +62,10 @@ public:
         ++document_count_;
         const vector<string> words = SplitIntoWordsNoStop(document);
         const int total_words = words.size();
-        double tf = 1.0 / total_words;
+        //Количество конкретного слова в документе(quantity of word in document)
+        double qowid = 1.0 / total_words;
         for (const auto& word : words) {
-            word_to_documents_freqs_[word][document_id] += tf;
+            word_to_documents_freqs_[word][document_id] += qowid;
         }
     }
 
@@ -121,21 +122,26 @@ private:
         }
         return query_words;
     }
-
-    vector<Document> FindAllDocuments(const Query& query_words) const {
-        vector<Document> matched_documents;
-
+    map<int, double> TfIdf(const Query& query_words) const {
         map<int, double> total_relevance;
-
-
-        for (const auto& pw : query_words.plusWords) {
-            if (word_to_documents_freqs_.count(pw)) {
-                double idf = log((1.0 * document_count_) / word_to_documents_freqs_.at(pw).size());
+        for(const auto& pw: query_words.plusWords){
+            if(word_to_documents_freqs_.count(pw)){
+               double idf = log((1.0 * document_count_) / word_to_documents_freqs_.at(pw).size());
                 for (const auto& [id, tf] : word_to_documents_freqs_.at(pw)) {
                     total_relevance[id] += tf * idf;
                 }
             }
         }
+        return total_relevance;
+    }
+
+    vector<Document> FindAllDocuments(const Query& query_words) const {
+        vector<Document> matched_documents;
+
+        map<int, double> total_relevance = TfIdf(query_words);
+
+
+        
 
 
         if (!query_words.minusWords.empty()) {
