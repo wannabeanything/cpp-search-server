@@ -10,6 +10,7 @@
 using namespace std;
 
 const int MAX_RESULT_DOCUMENT_COUNT = 5;
+const double EPSILON = 1e-6;
 
 string ReadLine() {
     string s;
@@ -74,16 +75,16 @@ public:
         }
         documents_.emplace(document_id, DocumentData{ComputeAverageRating(ratings), status});
     }
-    template<typename LambFunc>
+    template<typename DocumentPredicate>
     vector<Document> FindTopDocuments(const string& raw_query,
-                                      LambFunc pred_func) const {
+                                      DocumentPredicate pred_func) const {
         const Query query = ParseQuery(raw_query);
         auto matched_documents = FindAllDocuments(query, pred_func);
 
      
         sort(matched_documents.begin(), matched_documents.end(),
              [](const Document& lhs, const Document& rhs) {
-                 if (abs(lhs.relevance - rhs.relevance) < 1e-6) {
+                 if (abs(lhs.relevance - rhs.relevance) < EPSILON) {
                      return lhs.rating > rhs.rating;
                  } else {
                      return lhs.relevance > rhs.relevance;
@@ -95,24 +96,15 @@ public:
         return matched_documents;
     }
     
-    vector<Document> FindTopDocuments(const string& raw_query, DocumentStatus status) const{ 
-        switch(status){
-            case DocumentStatus::IRRELEVANT:
-                return FindTopDocuments(raw_query, [](int document_id, DocumentStatus status, int rating) { 
-                return status == DocumentStatus::IRRELEVANT; });
-            case DocumentStatus::BANNED:
-                return FindTopDocuments(raw_query, [](int document_id, DocumentStatus status, int rating) { 
-                return status == DocumentStatus::BANNED; });
-            case DocumentStatus::REMOVED:
-                return FindTopDocuments(raw_query, [](int document_id, DocumentStatus status, int rating) { 
-                return status == DocumentStatus::REMOVED; });
-            default:
-                return FindTopDocuments(raw_query, [](int document_id, DocumentStatus status, int rating) { 
-                return status == DocumentStatus::ACTUAL; });
-        }
+    vector<Document> FindTopDocuments(const string& raw_query, DocumentStatus desired_status) const{ 
+        return FindTopDocuments(raw_query, [desired_status](int document_id, DocumentStatus status, int rating) {
+            return status == DocumentStatus::ACTUAL;
+            
+        });
+
         
         
-     }
+    }
     
      vector<Document> FindTopDocuments(const string& raw_query) const{ 
          return FindTopDocuments(raw_query, DocumentStatus::ACTUAL);
@@ -180,6 +172,7 @@ private:
         }
         return rating_sum / static_cast<int>(ratings.size());
     }
+
 
     struct QueryWord {
         string data;
@@ -252,6 +245,11 @@ private:
         }
         return matched_documents;
     }
+
+    static DocumentStatus GetNextStatus(DocumentStatus status) {
+        return static_cast<DocumentStatus>(static_cast<int>(status) + 1);
+    } 
+
 };
 
 // ==================== для примера =========================
@@ -268,14 +266,14 @@ int main() {
     search_server.SetStopWords("и в на"s);
     search_server.AddDocument(0, "белый кот и модный ошейник"s,        DocumentStatus::ACTUAL, {8, -3});
     search_server.AddDocument(1, "пушистый кот пушистый хвост"s,       DocumentStatus::ACTUAL, {7, 2, 7});
-    search_server.AddDocument(2, "ухоженный пёс выразительные глаза"s, DocumentStatus::ACTUAL, {5, -12, 2, 1});
+    search_server.AddDocument(2, "ухоженный пёс выразительные глаза"s, DocumentStatus::REMOVED, {5, -12, 2, 1});
     search_server.AddDocument(3, "ухоженный скворец евгений"s,         DocumentStatus::BANNED, {9});
     cout << "ACTUAL by default:"s << endl;
     for (const Document& document : search_server.FindTopDocuments("пушистый ухоженный кот"s)) {
         PrintDocument(document);
     }
-    cout << "ACTUAL:"s << endl;
-    for (const Document& document : search_server.FindTopDocuments("пушистый ухоженный кот"s, [](int document_id, DocumentStatus status, int rating) { return status == DocumentStatus::ACTUAL; })) {
+    cout << "BANNED:"s << endl;
+    for (const Document& document : search_server.FindTopDocuments("пушистый ухоженный кот"s, [](int document_id, DocumentStatus status, int rating) { return status == DocumentStatus::BANNED; })) {
         PrintDocument(document);
     }
     cout << "Even ids:"s << endl;
