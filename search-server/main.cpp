@@ -118,10 +118,8 @@ public:
     template <typename DocumentPredicate>
     vector<Document> FindTopDocuments(const string& raw_query, DocumentPredicate document_predicate) const{
         
-        Query query;
-        if(!ParseQuery(raw_query, query)){
-            throw invalid_argument("Недопустимый символ или неправильный формат ввода минус-слов"s);
-        }
+        Query query = ParseQuery(raw_query);
+        
         auto matched_documents = FindAllDocuments(query, document_predicate);
         
         sort(matched_documents.begin(), matched_documents.end(),
@@ -238,7 +236,7 @@ private:
     };
 
     QueryWord ParseQueryWord(string text) const {
-        QueryWord result;
+        
         if(text.empty()){
             throw invalid_argument("Недопустимый символ или неправильный формат ввода минус-слов"s);
         }
@@ -252,8 +250,8 @@ private:
         if (text.empty() || text[0] == '-' || !IsValidWord(text)) {
             throw invalid_argument("Недопустимый символ или неправильный формат ввода минус-слов"s);
         }
-        result = {text, is_minus, IsStopWord(text)};
-        return result;
+        
+        return {text, is_minus, IsStopWord(text)};
     }
 
     struct Query {
