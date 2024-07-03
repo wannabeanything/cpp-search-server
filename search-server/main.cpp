@@ -12,7 +12,7 @@
 using namespace std;
 
 const int MAX_RESULT_DOCUMENT_COUNT = 5;
-
+const double EPSILON = 1e-6;
 string ReadLine() {
     string s;
     getline(cin, s);
@@ -93,13 +93,9 @@ public:
     explicit SearchServer(const string& stop_words_text)
         : SearchServer(SplitIntoWords(stop_words_text))  // Invoke delegating constructor from string container
     {
-        for(const auto& stop_word:SplitIntoWords(stop_words_text)){
-                if(!IsValidWord(stop_word)){
-                    throw invalid_argument("Недопустимый символ"s);
-                }
-            }
+        
     }
-    inline static constexpr int INVALID_DOCUMENT_ID = -1;
+    
     void AddDocument(int document_id, const string& document, DocumentStatus status,
                                    const vector<int>& ratings) {
         if (document_id < 0 || documents_.count(document_id) > 0) {
@@ -133,7 +129,7 @@ public:
         
         sort(matched_documents.begin(), matched_documents.end(),
              [](const Document& lhs, const Document& rhs) {
-                 if (abs(lhs.relevance - rhs.relevance) < 1e-6) {
+                 if (abs(lhs.relevance - rhs.relevance) < EPSILON) {
                      return lhs.rating > rhs.rating;
                  } else {
                      return lhs.relevance > rhs.relevance;
@@ -197,9 +193,7 @@ public:
         if (index < 0 || index >= documents_.size()) {
             throw out_of_range("Индекс не может быть отрицательным либо такого индекса нет"s);
         }
-        else {
-            return ids[index];
-        }
+        return ids[index];
     }
 
 private:
