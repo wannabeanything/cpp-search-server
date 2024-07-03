@@ -8,6 +8,7 @@
 #include <vector>
 #include <optional>
 #include <stdexcept>
+#include <numeric>
 
 using namespace std;
 
@@ -17,6 +18,7 @@ string ReadLine() {
     string s;
     getline(cin, s);
     return s;
+    
 }
 
 int ReadLineWithNumber() {
@@ -24,6 +26,7 @@ int ReadLineWithNumber() {
     cin >> result;
     ReadLine();
     return result;
+    
 }
 
 vector<string> SplitIntoWords(const string& text) {
@@ -83,10 +86,8 @@ public:
     template <typename StringContainer>
     explicit SearchServer(const StringContainer& stop_words)
         : stop_words_(MakeUniqueNonEmptyStrings(stop_words)) {
-            for(const auto& stop_word:stop_words){
-                if(!IsValidWord(stop_word)){
-                    throw invalid_argument("Недопустимый символ"s);
-                }
+            if (!all_of(stop_words.begin(), stop_words.end(), IsValidWord)) {
+                throw invalid_argument("Недопустимый символ"s);
             }
     }
 
@@ -101,15 +102,11 @@ public:
         if (document_id < 0 || documents_.count(document_id) > 0) {
             throw invalid_argument("Недопустимый id документа"s);
         }
+
+        vector<string> words = SplitIntoWordsNoStop(document);
         
-        
-        
-        vector<string> words;
-        if(!SplitIntoWordsNoStop(document, words)){
-            throw invalid_argument("Недопустимый символ в тексте документа"s);
-        }
         const double inv_word_count = 1.0 / words.size();
-        for (const string& word : words) {
+        for (const auto& word : words) {
             
             word_to_document_freqs_[word][document_id] += inv_word_count;
         }
@@ -160,10 +157,8 @@ public:
     tuple<vector<string>, DocumentStatus> MatchDocument(const string& raw_query, int document_id) const {
         
         
-        Query query;
-        if (ParseQuery(raw_query, query) == false) {
-            throw invalid_argument("Недопустимый символ или неправильный формат ввода минус-слов"s);
-        }
+        Query query = ParseQuery(raw_query);
+        
         
         vector<string> matched_words;
         for (const string& word : query.plus_words) {
@@ -212,29 +207,27 @@ private:
         return stop_words_.count(word) > 0;
     }
 
-    [[nodiscard]] bool SplitIntoWordsNoStop(const string& text, vector<string>& result) const {
-        result.clear();
+    vector<string> SplitIntoWordsNoStop(const string& text) const {
+        
         vector<string> words;
         for (const string& word : SplitIntoWords(text)) {
             if (!IsStopWord(word)) {
                 words.push_back(word);
             }
             if(!IsValidWord(word)){
-                return false;
+                throw invalid_argument("Недопустимый символ в тексте документа"s); 
             }
         }
-        result.swap(words);
-        return true;
+        
+        return words;
     }
 
     static int ComputeAverageRating(const vector<int>& ratings) {
         if (ratings.empty()) {
             return 0;
         }
-        int rating_sum = 0;
-        for (const int rating : ratings) {
-            rating_sum += rating;
-        }
+        int rating_sum = accumulate(ratings.begin(), ratings.end(), 0);
+        
         return rating_sum / static_cast<int>(ratings.size());
     }
 
@@ -244,10 +237,10 @@ private:
         bool is_stop;
     };
 
-    [[nodiscard]] bool ParseQueryWord(string text, QueryWord& result) const {
-        result = {};
+    QueryWord ParseQueryWord(string text) const {
+        QueryWord result;
         if(text.empty()){
-            return false;
+            throw invalid_argument("Недопустимый символ или неправильный формат ввода минус-слов"s);
         }
         bool is_minus = false;
         
@@ -257,10 +250,10 @@ private:
             text = text.substr(1);
         }
         if (text.empty() || text[0] == '-' || !IsValidWord(text)) {
-            return false;
+            throw invalid_argument("Недопустимый символ или неправильный формат ввода минус-слов"s);
         }
         result = {text, is_minus, IsStopWord(text)};
-        return true;
+        return result;
     }
 
     struct Query {
@@ -268,14 +261,12 @@ private:
         set<string> minus_words;
     };
 
-    [[nodiscard]] bool ParseQuery(const string& text, Query& result) const {
-        result = {};
+    Query ParseQuery(const string& text) const {
+        Query result;
         
         for (const string& word : SplitIntoWords(text)) {
-            QueryWord query_word;
-            if (!ParseQueryWord(word, query_word)) {
-                return false;
-            }
+            QueryWord query_word = ParseQueryWord(word);
+            
             
             if (!query_word.is_stop) {
                 if (query_word.is_minus) {
@@ -287,7 +278,7 @@ private:
             
         }
         
-        return true;
+        return result;
     }
 
     // Existence required
